@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SecureAuth - Create a Secure Account">
+    <title>Sign Up - SecureAuth</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="logo-icon">📝</div>
+            <h1>Create Account</h1>
+            <p class="subtitle">Join SecureAuth with a protected account</p>
+
+            <div id="signup-alert" class="alert"></div>
+
+            <form id="signup-form" autocomplete="off">
+                <div class="form-group">
+                    <label for="name">👤 Full Name</label>
+                    <input type="text" id="name" name="name" placeholder="Enter your full name" required minlength="2" maxlength="100">
+                </div>
+                <div class="form-group">
+                    <label for="email">📧 Email Address</label>
+                    <input type="email" id="email" name="email" placeholder="Enter your email" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">🔑 Password</label>
+                    <input type="password" id="password" name="password" placeholder="Min 8 chars, upper, lower, number, special" required minlength="8">
+                </div>
+                <div class="form-group">
+                    <label for="confirm-password">🔑 Confirm Password</label>
+                    <input type="password" id="confirm-password" placeholder="Re-enter your password" required>
+                </div>
+
+                <div id="password-strength" style="margin-bottom:1rem; font-size:.8rem;"></div>
+
+                <button type="submit" class="btn btn-success" id="signup-btn">
+                    ✨ Create Secure Account
+                </button>
+            </form>
+
+            <p style="text-align:center; margin-top:1.5rem; color:var(--text-secondary); font-size:.85rem;">
+                Already have an account? <a href="login.html">Sign In</a>
+            </p>
+        </div>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script>
+        const passwordInput = document.getElementById('password');
+        passwordInput.addEventListener('input', () => {
+            const val = passwordInput.value;
+            const el = document.getElementById('password-strength');
+            const checks = [
+                { test: val.length >= 8, label: '8+ characters' },
+                { test: /[A-Z]/.test(val), label: 'Uppercase' },
+                { test: /[a-z]/.test(val), label: 'Lowercase' },
+                { test: /[0-9]/.test(val), label: 'Number' },
+                { test: /[!@#$%^&*(),.?":{}|<>]/.test(val), label: 'Special char' }
+            ];
+            el.innerHTML = checks.map(c =>
+                `<span style="color:${c.test ? 'var(--accent-green)' : 'var(--text-muted)'};margin-right:.75rem;">${c.test ? '✓' : '○'} ${c.label}</span>`
+            ).join('');
+        });
+
+        document.getElementById('signup-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideAlert('signup-alert');
+
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+
+            if (password !== confirmPassword) {
+                showAlert('signup-alert', 'Passwords do not match.', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('signup-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Creating account...';
+
+            try {
+                const result = await apiRequest('/auth/signup', 'POST', { name, email, password });
+                if (result && result.success) {
+                    showAlert('signup-alert', 'Account created! Redirecting to login...', 'success');
+                    setTimeout(() => { window.location.href = '/login.html'; }, 1500);
+                } else {
+                    showAlert('signup-alert', result?.message || 'Signup failed.', 'error');
+                }
+            } catch (err) {
+                showAlert('signup-alert', 'Connection error. Please try again.', 'error');
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = '✨ Create Secure Account';
+        });
+    </script>
+</body>
+</html>

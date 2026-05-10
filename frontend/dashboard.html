@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SecureAuth - User Dashboard">
+    <title>Dashboard - SecureAuth</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <h2>🔒 SecureAuth</h2>
+                <span>Security Dashboard</span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-item active">📊 Dashboard</a>
+                <a href="leak-checker.html" class="nav-item">🔎 Leak Checker</a>
+                <a href="#" class="nav-item" id="admin-link" style="display:none;">👑 Admin Panel</a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar" id="sidebar-user-avatar">?</div>
+                    <div>
+                        <div class="user-name" id="sidebar-user-name">Loading...</div>
+                        <div class="user-role" id="sidebar-user-role">user</div>
+                    </div>
+                </div>
+                <button class="btn btn-outline btn-sm logout-btn" style="width:100%;margin-top:.5rem;">🚪 Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="page-header">
+                <h1>📊 Dashboard</h1>
+                <p>Welcome back! Here's your security overview.</p>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-grid">
+                <div class="stat-card blue">
+                    <div class="stat-icon">🔐</div>
+                    <div class="stat-value" id="stat-logins">0</div>
+                    <div class="stat-label">Successful Logins</div>
+                </div>
+                <div class="stat-card red">
+                    <div class="stat-icon">⚠️</div>
+                    <div class="stat-value" id="stat-failed">0</div>
+                    <div class="stat-label">Failed Attempts</div>
+                </div>
+                <div class="stat-card green">
+                    <div class="stat-icon">🕐</div>
+                    <div class="stat-value" id="stat-last" style="font-size:1rem;">N/A</div>
+                    <div class="stat-label">Last Login</div>
+                </div>
+                <div class="stat-card purple">
+                    <div class="stat-icon">🛡️</div>
+                    <div class="stat-value" id="stat-security">Active</div>
+                    <div class="stat-label">Security Status</div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <!-- Profile Update Form -->
+                <div class="card">
+                    <div class="card-header"><h3>👤 Update Profile</h3></div>
+                    <div id="profile-alert" class="alert"></div>
+                    <form id="profile-form">
+                        <div class="form-group">
+                            <label for="profile-name">Full Name</label>
+                            <input type="text" id="profile-name" required minlength="2">
+                        </div>
+                        <div class="form-group">
+                            <label for="profile-email">Email</label>
+                            <input type="email" id="profile-email" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm" style="width:100%;">💾 Update Profile</button>
+                    </form>
+                </div>
+
+                <!-- Security Status -->
+                <div class="card">
+                    <div class="card-header"><h3>🛡️ Security Features</h3></div>
+                    <div class="security-status">
+                        <div class="security-item"><span class="security-check">✓</span> Password Hashing (bcrypt)</div>
+                        <div class="security-item"><span class="security-check">✓</span> SQL Injection Prevention</div>
+                        <div class="security-item"><span class="security-check">✓</span> XSS Protection</div>
+                        <div class="security-item"><span class="security-check">✓</span> CSRF Token Protection</div>
+                        <div class="security-item"><span class="security-check">✓</span> Brute Force Protection</div>
+                        <div class="security-item"><span class="security-check">✓</span> Secure HTTP Headers (Helmet)</div>
+                        <div class="security-item"><span class="security-check">✓</span> Rate Limiting</div>
+                        <div class="security-item"><span class="security-check">✓</span> Role-Based Access Control</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Login Activity -->
+            <div class="card" style="margin-top:1.5rem;">
+                <div class="card-header"><h3>📋 Recent Login Activity</h3></div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Time</th><th>IP Address</th><th>Status</th></tr></thead>
+                        <tbody id="login-logs-body">
+                            <tr><td colspan="3" style="text-align:center;color:var(--text-muted);">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/common.js?v=3"></script>
+    <script>
+        (async () => {
+            const user = await checkAuth();
+            if (!user) return;
+            setSidebarUser(user);
+
+            if (user.role === 'admin') {
+                const al = document.getElementById('admin-link');
+                al.style.display = 'flex';
+                al.href = 'admin.html';
+            }
+
+            document.getElementById('profile-name').value = user.name || '';
+            document.getElementById('profile-email').value = user.email || '';
+
+            // Load dashboard stats
+            try {
+                const stats = await apiRequest('/user/dashboard-stats');
+                if (stats && stats.success) {
+                    document.getElementById('stat-logins').textContent = stats.stats.totalLogins;
+                    document.getElementById('stat-failed').textContent = stats.stats.failedAttempts;
+                    document.getElementById('stat-last').textContent = stats.stats.lastLogin ? formatDate(stats.stats.lastLogin) : 'First login!';
+
+                    const tbody = document.getElementById('login-logs-body');
+                    if (stats.stats.recentActivity && stats.stats.recentActivity.length > 0) {
+                        tbody.innerHTML = stats.stats.recentActivity.map(log => `
+                            <tr>
+                                <td>${formatDate(log.login_time)}</td>
+                                <td>${escapeHTML(log.ip_address)}</td>
+                                <td><span class="badge ${log.status === 'success' ? 'badge-success' : 'badge-danger'}">${log.status}</span></td>
+                            </tr>
+                        `).join('');
+                    } else {
+                        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);">No activity yet</td></tr>';
+                    }
+                }
+            } catch (err) { console.error('Stats error:', err); }
+
+            // Profile update
+            document.getElementById('profile-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                hideAlert('profile-alert');
+                const name = document.getElementById('profile-name').value;
+                const email = document.getElementById('profile-email').value;
+                try {
+                    const result = await apiRequest('/user/profile', 'PUT', { name, email });
+                    if (result && result.success) {
+                        showAlert('profile-alert', 'Profile updated successfully!', 'success');
+                    } else {
+                        showAlert('profile-alert', result?.message || 'Update failed.', 'error');
+                    }
+                } catch (err) {
+                    showAlert('profile-alert', 'Connection error.', 'error');
+                }
+            });
+        })();
+    </script>
+</body>
+</html>

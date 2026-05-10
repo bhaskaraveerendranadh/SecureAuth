@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SecureAuth - Admin Panel">
+    <title>Admin Panel - SecureAuth</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <h2>🔒 SecureAuth</h2>
+                <span>Admin Panel</span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-item">📊 Dashboard</a>
+                <a href="leak-checker.html" class="nav-item">🔎 Leak Checker</a>
+                <a href="admin.html" class="nav-item active">👑 Admin Panel</a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar" id="sidebar-user-avatar">A</div>
+                    <div>
+                        <div class="user-name" id="sidebar-user-name">Admin</div>
+                        <div class="user-role" id="sidebar-user-role">admin</div>
+                    </div>
+                </div>
+                <button class="btn btn-outline btn-sm logout-btn" style="width:100%;margin-top:.5rem;">🚪 Logout</button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="page-header">
+                <h1>👑 Admin Panel</h1>
+                <p>Manage users, view logs, and monitor security.</p>
+            </div>
+
+            <div id="admin-alert" class="alert"></div>
+
+            <!-- Users Table -->
+            <div class="card" style="margin-bottom:1.5rem;">
+                <div class="card-header"><h3>👥 All Users</h3></div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+                        <tbody id="users-body">
+                            <tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Login Logs -->
+            <div class="card">
+                <div class="card-header"><h3>📋 All Login Logs</h3></div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Time</th><th>User</th><th>Email</th><th>IP Address</th><th>Status</th></tr></thead>
+                        <tbody id="logs-body">
+                            <tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/common.js?v=3"></script>
+    <script>
+        async function loadUsers() {
+            try {
+                const result = await apiRequest('/admin/users');
+                const tbody = document.getElementById('users-body');
+                if (result && result.success && result.users.length > 0) {
+                    tbody.innerHTML = result.users.map(u => `
+                        <tr>
+                            <td>${u.id}</td>
+                            <td>${escapeHTML(u.name)}</td>
+                            <td>${escapeHTML(u.email)}</td>
+                            <td><span class="badge ${u.role === 'admin' ? 'badge-admin' : 'badge-info'}">${u.role}</span></td>
+                            <td><span class="badge ${u.is_blocked ? 'badge-danger' : 'badge-success'}">${u.is_blocked ? 'Blocked' : 'Active'}</span></td>
+                            <td>${formatDate(u.created_at)}</td>
+                            <td>
+                                ${u.role !== 'admin' ? `
+                                    <button class="btn btn-sm ${u.is_blocked ? 'btn-success' : 'btn-danger'}" 
+                                        onclick="toggleBlock(${u.id}, ${u.is_blocked})" style="margin-right:.25rem;">
+                                        ${u.is_blocked ? 'Unblock' : 'Block'}
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">Delete</button>
+                                ` : '<span style="color:var(--text-muted);font-size:.8rem;">Protected</span>'}
+                            </td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">No users found</td></tr>';
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        async function loadLogs() {
+            try {
+                const result = await apiRequest('/admin/logs');
+                const tbody = document.getElementById('logs-body');
+                if (result && result.success && result.logs.length > 0) {
+                    tbody.innerHTML = result.logs.map(l => `
+                        <tr>
+                            <td>${formatDate(l.login_time)}</td>
+                            <td>${escapeHTML(l.name || 'Unknown')}</td>
+                            <td>${escapeHTML(l.email || 'N/A')}</td>
+                            <td>${escapeHTML(l.ip_address)}</td>
+                            <td><span class="badge ${l.status === 'success' ? 'badge-success' : 'badge-danger'}">${l.status}</span></td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">No logs yet</td></tr>';
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        async function toggleBlock(id, isBlocked) {
+            const action = isBlocked ? 'unblock' : 'block';
+            if (!confirm(`Are you sure you want to ${action} this user?`)) return;
+            const result = await apiRequest(`/admin/users/${id}/${action}`, 'PUT');
+            if (result && result.success) {
+                showAlert('admin-alert', result.message, 'success');
+                loadUsers();
+            } else {
+                showAlert('admin-alert', result?.message || 'Action failed.', 'error');
+            }
+        }
+
+        async function deleteUser(id) {
+            if (!confirm('Are you sure you want to DELETE this user? This cannot be undone.')) return;
+            const result = await apiRequest(`/admin/users/${id}`, 'DELETE');
+            if (result && result.success) {
+                showAlert('admin-alert', result.message, 'success');
+                loadUsers();
+            } else {
+                showAlert('admin-alert', result?.message || 'Delete failed.', 'error');
+            }
+        }
+
+        (async () => {
+            const user = await checkAdmin();
+            if (!user) return;
+            setSidebarUser(user);
+            loadUsers();
+            loadLogs();
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SecureAuth - Data Leak Checker">
+    <title>Leak Checker - SecureAuth</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <h2>🔒 SecureAuth</h2>
+                <span>Security Tools</span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-item">📊 Dashboard</a>
+                <a href="leak-checker.html" class="nav-item active">🔎 Leak Checker</a>
+                <a href="#" class="nav-item" id="admin-link" style="display:none;">👑 Admin Panel</a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar" id="sidebar-user-avatar">?</div>
+                    <div>
+                        <div class="user-name" id="sidebar-user-name">Loading...</div>
+                        <div class="user-role" id="sidebar-user-role">user</div>
+                    </div>
+                </div>
+                <button class="btn btn-outline btn-sm logout-btn" style="width:100%;margin-top:.5rem;">🚪 Logout</button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="page-header">
+                <h1>🔎 Data Leak Checker</h1>
+                <p>Check if an email address has been compromised in known data breaches.</p>
+            </div>
+
+            <div class="card" style="max-width:600px;">
+                <div class="card-header"><h3>🔍 Check Email for Breaches</h3></div>
+                <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:1rem;">
+                    Enter an email address to check against our breach database. This input is protected against SQL Injection and XSS attacks.
+                </p>
+
+                <div id="leak-alert" class="alert"></div>
+
+                <form id="leak-form">
+                    <div class="form-group">
+                        <label for="leak-email">📧 Email Address to Check</label>
+                        <input type="text" id="leak-email" name="email" placeholder="Enter email to check for breaches" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="leak-btn">
+                        🔎 Check for Breaches
+                    </button>
+                </form>
+
+                <div id="breach-results" class="breach-results" style="display:none;">
+                    <h3 id="breach-title" style="margin-bottom:1rem;"></h3>
+                    <div id="breach-list"></div>
+                </div>
+            </div>
+
+            <!-- Security Info -->
+            <div class="card" style="max-width:600px;margin-top:1.5rem;">
+                <div class="card-header"><h3>🛡️ Security Note</h3></div>
+                <div class="security-status">
+                    <div class="security-item">
+                        <span class="security-check">✓</span>
+                        <span>This input field uses <strong>prepared statements</strong> — SQL Injection like <code>' OR 1=1 --</code> will FAIL</span>
+                    </div>
+                    <div class="security-item">
+                        <span class="security-check">✓</span>
+                        <span>Input is <strong>sanitized</strong> — XSS like <code>&lt;script&gt;alert(1)&lt;/script&gt;</code> is escaped</span>
+                    </div>
+                    <div class="security-item">
+                        <span class="security-check">✓</span>
+                        <span>Request requires <strong>CSRF token</strong> — cross-site forgery is blocked</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Test Payloads -->
+            <div class="card" style="max-width:600px;margin-top:1.5rem;">
+                <div class="card-header"><h3>🧪 Demo: Try These Attack Payloads</h3></div>
+                <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:1rem;">
+                    Click any payload to auto-fill the input. All attacks will be safely blocked!
+                </p>
+                <div style="display:flex;flex-direction:column;gap:.5rem;">
+                    <button type="button" class="btn btn-outline btn-sm payload-btn" data-payload="' OR 1=1 --" style="text-align:left;justify-content:flex-start;">
+                        💉 SQL Injection: <code>' OR 1=1 --</code>
+                    </button>
+                    <button type="button" class="btn btn-outline btn-sm payload-btn" data-payload="<script>alert(1)</script>" style="text-align:left;justify-content:flex-start;">
+                        🎭 XSS Attack: <code>&lt;script&gt;alert(1)&lt;/script&gt;</code>
+                    </button>
+                    <button type="button" class="btn btn-outline btn-sm payload-btn" data-payload='" onmouseover="alert(1)"' style="text-align:left;justify-content:flex-start;">
+                        🎭 XSS Event: <code>" onmouseover="alert(1)"</code>
+                    </button>
+                    <button type="button" class="btn btn-outline btn-sm payload-btn" data-payload="1; DROP TABLE users;--" style="text-align:left;justify-content:flex-start;">
+                        💉 SQL Drop: <code>1; DROP TABLE users;--</code>
+                    </button>
+                    <button type="button" class="btn btn-outline btn-sm payload-btn" data-payload="test@example.com" style="text-align:left;justify-content:flex-start;">
+                        ✅ Valid Email: <code>test@example.com</code> (has breach data)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Security Audit Log -->
+            <div class="card" style="max-width:600px;margin-top:1.5rem;margin-bottom:2rem;">
+                <div class="card-header"><h3>📋 Security Audit Log</h3></div>
+                <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:1rem;">
+                    This log tracks your check attempts and shows how the security layer handled each one.
+                </p>
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Target / Payload</th>
+                                <th>Result</th>
+                                <th>Security Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="audit-log-body">
+                            <tr>
+                                <td colspan="3" style="text-align:center;color:var(--text-muted);padding:2rem;">No activity yet.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/common.js?v=3"></script>
+    <script>
+        // Fill payload buttons
+        document.querySelectorAll('.payload-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.getElementById('leak-email').value = btn.getAttribute('data-payload');
+            });
+        });
+
+        // Add to audit log
+        function addToAuditLog(input, result) {
+            const tbody = document.getElementById('audit-log-body');
+            // Remove empty message if it's the first real entry
+            if (tbody.children.length === 1 && tbody.children[0].cells.length === 1) {
+                tbody.innerHTML = '';
+            }
+
+            const row = document.createElement('tr');
+            
+            let statusBadge = '';
+            if (result.attackDetected) {
+                statusBadge = '<span class="badge badge-info">🛡️ Neutralized</span>';
+            } else if (result.success) {
+                statusBadge = '<span class="badge badge-success">✅ Safe</span>';
+            } else {
+                statusBadge = '<span class="badge badge-danger">❌ Error</span>';
+            }
+
+            let outcome = '';
+            if (result.found) {
+                outcome = `<span style="color:var(--accent-red);font-weight:600;">🚨 ${result.breaches.length} Breach(es)</span>`;
+            } else if (result.success) {
+                outcome = '<span style="color:var(--accent-green);">No Breach</span>';
+            } else {
+                outcome = 'N/A';
+            }
+
+            row.innerHTML = `
+                <td style="word-break:break-all;"><code style="color:var(--accent-purple);">${escapeHTML(input)}</code></td>
+                <td>${outcome}</td>
+                <td>${statusBadge}</td>
+            `;
+            
+            tbody.prepend(row);
+        }
+
+        document.getElementById('leak-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideAlert('leak-alert');
+            const btn = document.getElementById('leak-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Checking...';
+
+            const email = document.getElementById('leak-email').value;
+
+            try {
+                const result = await apiRequest('/user/check-leak', 'POST', { email });
+                const resultsDiv = document.getElementById('breach-results');
+                const titleEl = document.getElementById('breach-title');
+                const listEl = document.getElementById('breach-list');
+
+                if (result && result.success) {
+                    resultsDiv.style.display = 'block';
+                    if (result.found) {
+                        titleEl.innerHTML = `<span style="color:var(--accent-red);">⚠️ ${result.breaches.length} Breach(es) Found!</span>`;
+                        listEl.innerHTML = result.breaches.map(b => `
+                            <div class="breach-item">
+                                <span style="font-size:1.25rem;">🚨</span>
+                                <div>
+                                    <strong>${escapeHTML(b.breach_name)}</strong><br>
+                                    <span style="color:var(--text-muted);font-size:.8rem;">${escapeHTML(b.email)}</span>
+                                </div>
+                            </div>
+                        `).join('');
+                    } else if (result.attackDetected) {
+                        titleEl.innerHTML = '<span style="color:var(--accent-blue);">🛡️ Attack Neutralized</span>';
+                        listEl.innerHTML = `
+                            <div style="background:rgba(0,122,255,0.1); border-left:4px solid var(--accent-blue); padding:1rem; border-radius:4px;">
+                                <p style="color:var(--text-primary);font-weight:600;margin-bottom:.5rem;">Security Layer Triggered!</p>
+                                <p style="color:var(--text-secondary);font-size:.9rem;">
+                                    A common attack pattern was detected in your input. Because this system uses <strong>prepared statements</strong> and <strong>input sanitization</strong>, the attack was treated as a literal string and safely neutralized.
+                                </p>
+                            </div>
+                        `;
+                    } else {
+                        titleEl.innerHTML = '<span style="color:var(--accent-green);">✅ No Breaches Found</span>';
+                        listEl.innerHTML = '<p style="color:var(--text-secondary);">This email was not found in any known data breaches.</p>';
+                    }
+                    } else {
+                        showAlert('leak-alert', result?.message || 'Check failed.', 'error');
+                        resultsDiv.style.display = 'none';
+                    }
+                    
+                    // Add this attempt to the visual log
+                    addToAuditLog(email, result);
+                } catch (err) {
+                    showAlert('leak-alert', 'Connection error.', 'error');
+                    addToAuditLog(email, { success: false });
+                }
+
+            btn.disabled = false;
+            btn.innerHTML = '🔎 Check for Breaches';
+        });
+
+        (async () => {
+            const user = await checkAuth();
+            if (!user) return;
+            setSidebarUser(user);
+            if (user.role === 'admin') {
+                const al = document.getElementById('admin-link');
+                al.style.display = 'flex';
+                al.href = 'admin.html';
+            }
+        })();
+    </script>
+</body>
+</html>
